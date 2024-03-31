@@ -88,7 +88,22 @@ def send_barcode_info(message):
 
 def process_image(message):
     file_info = bot.get_file(message.photo[-1].file_id)  # Получаем информацию о файле
-    file = requests.get('https://api.telegram.org/file/bot{0}/{1}'.format(TOKEN, file_info.file_path))  # Скачиваем файл
+    url='https://api.telegram.org/file/bot{0}/{1}'
+    max_retries = 3  # Максимальное количество попыток
+    retry_count = 0
+
+    while retry_count < max_retries:
+        try:
+            # Ваша команда или операция, которая может вызвать ошибку
+            file = requests.get(url.format(TOKEN, file_info.file_path), timeout=120)
+            print("Операция выполнена успешно.")
+            break  # Выход из цикла при успешном выполнении
+        except requests.exceptions.ReadTimeout:
+            print("Произошла ошибка ReadTimeout, повторяем операцию.")
+            retry_count += 1
+    else:
+        print(f"Достигнуто максимальное количество попыток ({max_retries}).")
+
 
     img = Image.open(BytesIO(file.content))  # Открываем изображение
     barcodes = decode(img)  # Распознаем штрих-коды
@@ -126,4 +141,4 @@ def process_image(message):
             bot.reply_to(message, f"{data}\n\nПароль: <code>IPoE-Opt82</code>", parse_mode='HTML')
             return True  # Возвращаем True, так как операция была успешной
 
-bot.polling()
+bot.polling(none_stop=True, interval=5)
