@@ -3,84 +3,48 @@ from pyzbar.pyzbar import decode
 from PIL import Image
 from io import BytesIO
 import requests
+import re
 
 #Открываем файл token.txt для чтения токена
 with open('token.txt', 'r') as file:
     TOKEN = file.read().strip()
 
 bot = telebot.TeleBot(TOKEN)
+@bot.message_handler(content_types=['photo'])
+def handle_docs_photo(message):
+    #success = False  # Инициализируем флаг успеха
+    try:
+        success = process_image(message)  # Если функция вернула True, значит, операция была успешной
+    except Exception as e:
+        bot.reply_to(message, "Произошла системная ошибка, попробуйте снова")  # Если что-то пошло не так, отправляем сообщение об ошибке
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    welcome_text = """
-    Привет! Я бот, который может помочь вам расшифровать штрих-коды ONU устройств. Вот как вы можете меня использовать:
-    
-    1. Отправьте мне фотографию с штрих-кодом, используя обычное сообщение или пересланное сообщение из другого чата.
-    2. Я попытаюсь расшифровать штрих-код и отправлю вам информацию о нем.
-    3. Если у вас возникнут проблемы или вопросы, вы можете использовать команду /help для получения дополнительной информации.
-    
-    Надеюсь, я смогу вам помочь!
-    """
+    with open('TextMessages/start.txt', 'r', encoding='utf-8') as file:
+        welcome_text = file.read().strip()
     bot.send_message(message.chat.id, welcome_text)
 
 
 @bot.message_handler(commands=['help'])
 def send_help(message):
-    help_text = """
-    Привет! Вот как вы можете использовать этого бота:
-    
-    1. Отправьте фотографию ONU устройства, где видно штрих-код, и я попытаюсь его расшифровать.
-    2. Если я смогу расшифровать штрих-код, я отправлю вам логин и пароль для добавления ONU в UTM.
-    3. Если я не смогу расшифровать штрих-код, я сообщу вам об этом.
-    4. Причины, по которым я не смогу расшифровать штрих-код ты можешь узнать тут: /barcode.
-    5. Я могу обрабатывать сразу несколько фото, а данные буду высылать по порядку, отвечая на каждое отдельное фото.
-    6. Информацию о вендорах, с которыми я умею работать можно узнать тут: /vendors
-    7. По другим вопросам или если вы нашли баг обращайтесь к моему создателю: @Twelve_Stein
-
-
-    Версия бота: 1.0 
-    Последнее обновление: 28.03.2024
-    """
+    with open('TextMessages/help.txt', 'r', encoding='utf-8') as file:
+        help_text = file.read().strip()
     bot.send_message(message.chat.id, help_text)
 
 @bot.message_handler(commands=['vendors'])
 def send_vendors_info(message):
-    vendors_info_text = """
-    Вот список вендоров, штрих-коды которых я могу расшифровать:
-    
-    1. <b>ZTE</b>: Штрих-коды этих устройств обычно содержат "ztxg".
-    2. <b>Huawei</b>: Штрих-коды этих устройств обычно содержат "48575443".
-    3. <b>CData</b>: Штрих-коды этих устройств обычно содержат "hwtc".
-    4. <b>STELS</b>: Штрих-коды этих устройств обычно содержат "e067".
-    
-    Если штрих-код, который вы отправили, не соответствует ни одному из этих вендоров, я сообщу вам об этом.
-    """
+    with open('TextMessages/vendors.txt', 'r', encoding='utf-8') as file:
+       vendors_info_text = file.read().strip()
     bot.send_message(message.chat.id, vendors_info_text, parse_mode='HTML')
 
 
 
 @bot.message_handler(commands=['barcode'])
 def send_barcode_info(message):
-    barcode_info_text = """
-    Чтобы я мог расшифровать штрих-код, вам нужно отправить мне фотографию с ним. Вот несколько советов:
-    
-    1. Убедитесь, что штрих-код четко виден на фотографии. Избегайте мыльных, маленьких или размытых изображений.
-    2. Попробуйте избегать бликов и теней на штрих-коде.
-    3. Штрих-код должен быть расположен прямо перед камерой, а не под углом.
-    4. Если штрих-код поврежден или частично скрыт, я могу не суметь его расшифровать.
-    5. Если вы считаете, что с фотографией всё нормально, но я не могу её обработать, то просто выделите облась со штрих-кодами на фото, и отправьте мне ещё раз уже скриншот.
-    
-    После того, как вы отправите фотографию, я попытаюсь расшифровать штрих-код и отправлю вам информацию о нем.
-    """
+    with open('TextMessages/barcode.txt', 'r', encoding='utf-8'):
+        barcode_info_text = file.read().strip()
     bot.send_message(message.chat.id, barcode_info_text)
 
-
-@bot.message_handler(content_types=['photo'])
-def handle_docs_photo(message):
-    try:
-        process_image(message)
-    except Exception as e:
-        bot.reply_to(message, "Произошла системная ошибка, попробуйте снова")
 
 def process_image(message):
     file_info = bot.get_file(message.photo[-1].file_id)
@@ -96,13 +60,10 @@ def process_image(message):
     def process_cdata(data):
         mac_address = None
         p_sn = None
-        if "70a5" in data:  # Предполагаем, что "70a5" присутствует в MAC
-            mac_address = data
-        if "hwtc" in data:  # Предполагаем, что "hwtc" присутствует в P-SN
+        if "hwtc" in data:  # Предполагаем, что "hwtc" присутствует в MAC и P-SN
+            mac_address = data.replace("hwtc", "70a5")
             p_sn = data.replace("hwtc", "48575443")
         return mac_address, p_sn
-
-
 
     def process_stels(data):
         return data
@@ -117,32 +78,38 @@ def process_image(message):
     img = Image.open(BytesIO(file.content))
     barcodes = decode(img)
 
-    mac_address = None
-    p_sn = None
-    vendor = None
-    for barcode in sorted(barcodes, key=lambda b: "70a5" in b.data.decode('utf-8').lower(), reverse=True):
+    if not barcodes:
+        bot.reply_to(message, "На изображении не обнаружено штрих-кодов. Пожалуйста, попробуйте снова или выделите область со штрих-кодами на фото")
+        return False
+    
+
+    results = []
+    for barcode in barcodes:
         decoded_data = barcode.data.decode('utf-8').lower()
         for code, (v, processor) in vendor_codes.items():
             if code in decoded_data:
                 edited_data = processor(decoded_data)
-                if v == "CData":
-                    mac, psn = edited_data
-                    if mac is not None:
-                        mac_address = mac
-                    if psn is not None:
-                        p_sn = psn
-                    vendor = v
-                else:
-                    vendor = v
-                    login = edited_data
+                results.append((v, edited_data))
 
-    if vendor == "CData":
-        bot.reply_to(message, f"Вендор: <b>{vendor}</b>\n\nMAC адресс: <code>{mac_address}</code>\nP-SN: <code>{p_sn}</code>\nПароль: <code>IPoE-Opt82</code>", parse_mode='HTML')
-    elif vendor is not None:
-        bot.reply_to(message, f"Вендор: <b>{vendor}</b>\n\nЛогин: <code>{login}</code>\nПароль: <code>IPoE-Opt82</code>", parse_mode='HTML')
-    else:
+    barcode_success = False
+    for v, data in results:
+        if v == "CData":
+            mac, psn = data
+            if mac is not None or psn is not None:  # Успех, если найден хотя бы один параметр
+                bot.reply_to(message, f"Вендор: <b>{v}</b>\n\nEPON: <code>{mac}</code>\nGPON: <code>{psn}</code>\nПароль: <code>IPoE-Opt82</code> \n\n<b>Обратите внимание!</b>\nКопируйте логин, в зависимости от типа ONU, он обычно указан на фотографии.\nПодробнее в /vendors", parse_mode='HTML')
+                barcode_success = True
+                break
+        else:
+            vendor = v
+            login = data
+            bot.reply_to(message, f"Вендор: <b>{vendor}</b>\n\nЛогин: <code>{login}</code>\nПароль: <code>IPoE-Opt82</code>", parse_mode='HTML')
+            barcode_success = True
+            break
+
+    if not barcode_success:
         data = "\n".join([f"Найден штрих-код <code>{barcode.data.decode('utf-8').lower()}</code>" for barcode in barcodes])
         bot.reply_to(message, f"Неизвестное ONU устройство\n\n{data}\n\nПароль: <code>IPoE-Opt82</code>", parse_mode='HTML')
+        barcode_success = True
 
-
+    return barcode_success
 bot.polling(none_stop=True, interval=5)
