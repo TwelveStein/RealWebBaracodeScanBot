@@ -41,7 +41,7 @@ def send_vendors_info(message):
 
 @bot.message_handler(commands=['barcode'])
 def send_barcode_info(message):
-    with open('TextMessages/barcode.txt', 'r', encoding='utf-8'):
+    with open('TextMessages/barcode.txt', 'r', encoding='utf-8') as file:
         barcode_info_text = file.read().strip()
     bot.send_message(message.chat.id, barcode_info_text)
 
