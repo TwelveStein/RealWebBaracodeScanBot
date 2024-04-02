@@ -4,6 +4,7 @@ from PIL import Image
 from io import BytesIO
 import requests
 import eventlet
+import time
 
 eventlet.monkey_patch()
 
@@ -120,5 +121,10 @@ def process_image(message):
             print("Не удалось получить изображение.")
     except eventlet.Timeout:
         print("Превышено время ожидания при получении файла.")
-    
-bot.polling(none_stop=True, interval=5)
+while True:
+    try:
+        bot.polling(none_stop=True, interval=10)
+    except Exception as e:
+        print(f"Ошибка: {e}. Повторная попытка через 5 секунд.")
+        time.sleep(5)
+            
